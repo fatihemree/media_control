@@ -47,6 +47,34 @@ class PlayerView extends StatelessWidget {
     );
   }
 
+  Widget _buildSlider(BuildContext context, AudioPlayerViewModel viewModel) {
+    return SliderTheme(
+      data: SliderTheme.of(context).copyWith(
+        trackHeight: 2,
+        thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6),
+        overlayShape: const RoundSliderOverlayShape(overlayRadius: 14),
+        activeTrackColor: Colors.green,
+        inactiveTrackColor: Colors.grey[800],
+        thumbColor: Colors.white,
+        overlayColor: Colors.green.withOpacity(0.2),
+      ),
+      child: Slider(
+        value: viewModel.position.inMilliseconds.toDouble().clamp(0, viewModel.duration.inMilliseconds.toDouble()),
+        min: 0,
+        max: viewModel.duration.inMilliseconds.toDouble(),
+        onChangeStart: (_) {
+          viewModel.seekStart();
+        },
+        onChanged: (value) {
+          viewModel.seek(Duration(milliseconds: value.toInt()));
+        },
+        onChangeEnd: (_) {
+          viewModel.seekEnd();
+        },
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Consumer<AudioPlayerViewModel>(
@@ -119,25 +147,7 @@ class PlayerView extends StatelessWidget {
 
                     const SizedBox(height: 20),
 
-                    SliderTheme(
-                      data: SliderTheme.of(context).copyWith(
-                        trackHeight: 2,
-                        thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6),
-                        overlayShape: const RoundSliderOverlayShape(overlayRadius: 14),
-                        activeTrackColor: Colors.green,
-                        inactiveTrackColor: Colors.grey[800],
-                        thumbColor: Colors.white,
-                        overlayColor: Colors.green.withOpacity(0.2),
-                      ),
-                      child: Slider(
-                        value: viewModel.position.inSeconds.toDouble(),
-                        min: 0,
-                        max: viewModel.duration.inSeconds.toDouble(),
-                        onChanged: (value) {
-                          viewModel.seek(Duration(seconds: value.toInt()));
-                        },
-                      ),
-                    ),
+                    _buildSlider(context, viewModel),
 
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 16),

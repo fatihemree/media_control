@@ -1,3 +1,5 @@
+import 'dart:io' show Platform;
+
 import 'package:audio_service/audio_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_cache_manager/flutter_cache_manager.dart';
@@ -16,13 +18,18 @@ Future<void> main() async {
   // Clear the image cache to prevent database locks
   await DefaultCacheManager().emptyCache();
 
-  // Initialize AudioService
+  // Initialize AudioService with platform-specific configuration
   final audioHandler = await AudioService.init(
     builder: () => AudioPlayerHandler(),
-    config: const AudioServiceConfig(
+    config: AudioServiceConfig(
       androidNotificationChannelId: 'com.example.media_control.channel.audio',
       androidNotificationChannelName: 'Audio playback',
-      androidNotificationOngoing: true,
+      androidNotificationOngoing: !Platform.isIOS,
+      androidStopForegroundOnPause: Platform.isAndroid,
+      fastForwardInterval: const Duration(seconds: 10),
+      rewindInterval: const Duration(seconds: 10),
+      androidNotificationIcon: 'mipmap/ic_launcher',
+      notificationColor: Colors.grey[900],
     ),
   );
 

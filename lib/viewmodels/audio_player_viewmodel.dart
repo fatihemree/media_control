@@ -15,6 +15,7 @@ class AudioPlayerViewModel extends ChangeNotifier {
 
   StreamSubscription<PlaybackState>? _playbackStateSubscription;
   StreamSubscription<MediaItem?>? _mediaItemSubscription;
+  Timer? _positionTimer;
 
   Song? _currentSong;
   List<Song> _songs = [];
@@ -22,6 +23,7 @@ class AudioPlayerViewModel extends ChangeNotifier {
   bool _isPlaying = false;
   bool _isRepeatEnabled = false;
   bool _isShuffleEnabled = false;
+  bool _isSeeking = false;
   Duration _position = Duration.zero;
   Duration _duration = Duration.zero;
   String? _error;
@@ -32,18 +34,16 @@ class AudioPlayerViewModel extends ChangeNotifier {
   }
 
   void _initStreams() {
+    _playbackStateSubscription?.cancel();
+    _mediaItemSubscription?.cancel();
+    _positionTimer?.cancel();
+
     _playbackStateSubscription = _audioHandler.playbackState.listen(
       (state) {
         _isPlaying = state.playing;
-        _position = state.position;
-
-        // Handle completion
-        if (state.processingState == AudioProcessingState.completed) {
-          if (_isRepeatEnabled) {
-            _handleRepeat();
-          } else {
-            playNext();
-          }
+        if (!_isSeeking) {
+          final newPosition = state.position;
+          _position = newPosition > _duration ? _duration : newPosition;
         }
         notifyListeners();
       },
@@ -65,6 +65,19 @@ class AudioPlayerViewModel extends ChangeNotifier {
         notifyListeners();
       },
     );
+
+    // Start position timer
+    _startPositionTimer();
+  }
+
+  void _startPositionTimer() {
+    _positionTimer?.cancel();
+    _positionTimer = Timer.periodic(const Duration(milliseconds: 200), (timer) {
+      if (_isPlaying && !_isSeeking) {
+        _position += const Duration(milliseconds: 200);
+        notifyListeners();
+      }
+    });
   }
 
   void _loadSongs() {
@@ -72,7 +85,7 @@ class AudioPlayerViewModel extends ChangeNotifier {
       _songs = _songService.getSampleSongs();
       _shuffledSongs = List.from(_songs);
       if (_songs.isNotEmpty) {
-        playSong(_songs[0]);
+        _loadPlaylist(_songs, 0);
       }
     } catch (e) {
       _error = e.toString();
@@ -80,33 +93,16 @@ class AudioPlayerViewModel extends ChangeNotifier {
     }
   }
 
-  void _handleRepeat() async {
-    if (_currentSong != null) {
-      await _audioHandler.seek(Duration.zero);
-      await _audioHandler.play();
+  Future<void> _loadPlaylist(List<Song> songs, int initialIndex) async {
+    try {
+      await _audioHandler.loadPlaylist(songs, initialIndex);
+      _currentSong = songs[initialIndex];
+      notifyListeners();
+    } catch (e) {
+      _error = e.toString();
+      notifyListeners();
     }
   }
-
-  void _shuffleSongs() {
-    _shuffledSongs = List.from(_songs);
-    for (var i = _shuffledSongs.length - 1; i > 0; i--) {
-      var j = _random.nextInt(i + 1);
-      var temp = _shuffledSongs[i];
-      _shuffledSongs[i] = _shuffledSongs[j];
-      _shuffledSongs[j] = temp;
-    }
-  }
-
-  List<Song> get _currentPlaylist => _isShuffleEnabled ? _shuffledSongs : _songs;
-
-  Song? get currentSong => _currentSong;
-  List<Song> get songs => _songs;
-  bool get isPlaying => _isPlaying;
-  bool get isRepeatEnabled => _isRepeatEnabled;
-  bool get isShuffleEnabled => _isShuffleEnabled;
-  Duration get position => _position;
-  Duration get duration => _duration;
-  String? get error => _error;
 
   void toggleRepeat() {
     _isRepeatEnabled = !_isRepeatEnabled;
@@ -125,17 +121,67 @@ class AudioPlayerViewModel extends ChangeNotifier {
           _shuffledSongs.insert(0, _currentSong!);
         }
       }
+      _loadPlaylist(_shuffledSongs, 0);
+    } else {
+      if (_currentSong != null) {
+        final index = _songs.indexOf(_currentSong!);
+        if (index != -1) {
+          _loadPlaylist(_songs, index);
+        }
+      }
     }
     notifyListeners();
   }
 
+  void _shuffleSongs() {
+    _shuffledSongs = List.from(_songs);
+    for (var i = _shuffledSongs.length - 1; i > 0; i--) {
+      var j = _random.nextInt(i + 1);
+      var temp = _shuffledSongs[i];
+      _shuffledSongs[i] = _shuffledSongs[j];
+      _shuffledSongs[j] = temp;
+    }
+  }
+
+  List<Song> get _currentPlaylist => _isShuffleEnabled ? _shuffledSongs : _songs;
+
   Future<void> playSong(Song song) async {
     try {
-      _currentSong = song;
-      _duration = song.duration;
-      _error = null;
-      await _audioHandler.setAudioSource(song);
+      final index = _currentPlaylist.indexOf(song);
+      if (index != -1) {
+        await _loadPlaylist(_currentPlaylist, index);
+      }
+    } catch (e) {
+      _error = e.toString();
+      notifyListeners();
+    }
+  }
+
+  Future<void> play() async {
+    try {
       await _audioHandler.play();
+    } catch (e) {
+      _error = e.toString();
+      notifyListeners();
+    }
+  }
+
+  Future<void> pause() async {
+    try {
+      await _audioHandler.pause();
+    } catch (e) {
+      _error = e.toString();
+      notifyListeners();
+    }
+  }
+
+  Future<void> seekStart() async {
+    _isSeeking = true;
+  }
+
+  Future<void> seek(Duration position) async {
+    try {
+      _position = position;
       notifyListeners();
     } catch (e) {
       _error = e.toString();
@@ -143,51 +189,57 @@ class AudioPlayerViewModel extends ChangeNotifier {
     }
   }
 
-  void play() {
-    _audioHandler.play();
-  }
-
-  void pause() {
-    _audioHandler.pause();
-  }
-
-  void seek(Duration position) {
-    _audioHandler.seek(position);
-  }
-
-  void stop() {
-    _audioHandler.stop();
-  }
-
-  void playNext() {
-    if (_currentSong == null || _currentPlaylist.isEmpty) return;
-    final currentIndex = _currentPlaylist.indexOf(_currentSong!);
-    if (currentIndex < _currentPlaylist.length - 1) {
-      playSong(_currentPlaylist[currentIndex + 1]);
-    } else if (_isRepeatEnabled) {
-      // If repeat is enabled and we're at the end, play the first song
-      playSong(_currentPlaylist[0]);
+  Future<void> seekEnd() async {
+    try {
+      _isSeeking = false;
+      await _audioHandler.seek(_position);
+    } catch (e) {
+      _error = e.toString();
+      notifyListeners();
     }
   }
 
-  void playPrevious() {
-    if (_currentSong == null || _currentPlaylist.isEmpty) return;
-    final currentIndex = _currentPlaylist.indexOf(_currentSong!);
-    // If we're more than 3 seconds into the song, restart it
-    if (_position.inSeconds > 3) {
-      seek(Duration.zero);
-    } else if (currentIndex > 0) {
-      playSong(_currentPlaylist[currentIndex - 1]);
-    } else if (_isRepeatEnabled) {
-      // If repeat is enabled and we're at the start, play the last song
-      playSong(_currentPlaylist.last);
+  Future<void> stop() async {
+    try {
+      await _audioHandler.stop();
+    } catch (e) {
+      _error = e.toString();
+      notifyListeners();
     }
   }
+
+  void playNext() async {
+    try {
+      await _audioHandler.skipToNext();
+    } catch (e) {
+      _error = e.toString();
+      notifyListeners();
+    }
+  }
+
+  void playPrevious() async {
+    try {
+      await _audioHandler.skipToPrevious();
+    } catch (e) {
+      _error = e.toString();
+      notifyListeners();
+    }
+  }
+
+  Song? get currentSong => _currentSong;
+  List<Song> get songs => _songs;
+  bool get isPlaying => _isPlaying;
+  bool get isRepeatEnabled => _isRepeatEnabled;
+  bool get isShuffleEnabled => _isShuffleEnabled;
+  Duration get position => _position;
+  Duration get duration => _duration;
+  String? get error => _error;
 
   @override
   void dispose() {
     _playbackStateSubscription?.cancel();
     _mediaItemSubscription?.cancel();
+    _positionTimer?.cancel();
     super.dispose();
   }
 
