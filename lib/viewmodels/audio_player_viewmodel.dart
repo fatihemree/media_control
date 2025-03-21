@@ -8,15 +8,18 @@ import '../models/song.dart';
 import '../services/audio_handler.dart';
 import '../services/song_service.dart';
 
+// Müzik çalar için ViewModel sınıfı
 class AudioPlayerViewModel extends ChangeNotifier {
   final AudioPlayerHandler _audioHandler;
   final SongService _songService = SongService();
   final Random _random = Random();
 
+  // Stream abonelikleri
   StreamSubscription<PlaybackState>? _playbackStateSubscription;
   StreamSubscription<MediaItem?>? _mediaItemSubscription;
   Timer? _positionTimer;
 
+  // Durum değişkenleri
   Song? _currentSong;
   List<Song> _songs = [];
   List<Song> _shuffledSongs = [];
@@ -33,15 +36,19 @@ class AudioPlayerViewModel extends ChangeNotifier {
     _initStreams();
   }
 
+  // Stream'leri başlatan metod
   void _initStreams() {
+    // Önceki stream aboneliklerini iptal et
     _playbackStateSubscription?.cancel();
     _mediaItemSubscription?.cancel();
     _positionTimer?.cancel();
 
+    // Çalma durumu değişikliklerini dinle
     _playbackStateSubscription = _audioHandler.playbackState.listen(
       (state) {
         _isPlaying = state.playing;
         if (!_isSeeking) {
+          // Pozisyon değerinin süreyi aşmamasını sağla
           final newPosition = state.position;
           _position = newPosition > _duration ? _duration : newPosition;
         }
@@ -53,6 +60,7 @@ class AudioPlayerViewModel extends ChangeNotifier {
       },
     );
 
+    // Medya öğesi değişikliklerini dinle
     _mediaItemSubscription = _audioHandler.mediaItem.listen(
       (item) {
         if (item?.duration != null) {
@@ -66,10 +74,11 @@ class AudioPlayerViewModel extends ChangeNotifier {
       },
     );
 
-    // Start position timer
+    // Pozisyon zamanlayıcısını başlat
     _startPositionTimer();
   }
 
+  // Pozisyon güncelleme zamanlayıcısını başlatan metod
   void _startPositionTimer() {
     _positionTimer?.cancel();
     _positionTimer = Timer.periodic(const Duration(milliseconds: 200), (timer) {
@@ -80,6 +89,7 @@ class AudioPlayerViewModel extends ChangeNotifier {
     });
   }
 
+  // Şarkıları yükleyen metod
   void _loadSongs() {
     try {
       _songs = _songService.getSampleSongs();
@@ -93,6 +103,7 @@ class AudioPlayerViewModel extends ChangeNotifier {
     }
   }
 
+  // Çalma listesini yükleyen metod
   Future<void> _loadPlaylist(List<Song> songs, int initialIndex) async {
     try {
       await _audioHandler.loadPlaylist(songs, initialIndex);
@@ -104,16 +115,18 @@ class AudioPlayerViewModel extends ChangeNotifier {
     }
   }
 
+  // Tekrar modunu değiştiren metod
   void toggleRepeat() {
     _isRepeatEnabled = !_isRepeatEnabled;
     notifyListeners();
   }
 
+  // Karıştırma modunu değiştiren metod
   void toggleShuffle() {
     _isShuffleEnabled = !_isShuffleEnabled;
     if (_isShuffleEnabled) {
       _shuffleSongs();
-      // Keep current song at the start of shuffled list
+      // Mevcut şarkıyı karıştırılmış listenin başına al
       if (_currentSong != null) {
         final index = _shuffledSongs.indexOf(_currentSong!);
         if (index != -1) {
@@ -133,6 +146,7 @@ class AudioPlayerViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
+  // Şarkıları karıştıran yardımcı metod
   void _shuffleSongs() {
     _shuffledSongs = List.from(_songs);
     for (var i = _shuffledSongs.length - 1; i > 0; i--) {
@@ -143,8 +157,10 @@ class AudioPlayerViewModel extends ChangeNotifier {
     }
   }
 
+  // Aktif çalma listesini döndüren getter
   List<Song> get _currentPlaylist => _isShuffleEnabled ? _shuffledSongs : _songs;
 
+  // Belirli bir şarkıyı çalan metod
   Future<void> playSong(Song song) async {
     try {
       final index = _currentPlaylist.indexOf(song);
@@ -157,6 +173,7 @@ class AudioPlayerViewModel extends ChangeNotifier {
     }
   }
 
+  // Çalmayı başlatan metod
   Future<void> play() async {
     try {
       await _audioHandler.play();
@@ -166,6 +183,7 @@ class AudioPlayerViewModel extends ChangeNotifier {
     }
   }
 
+  // Çalmayı duraklatma metodu
   Future<void> pause() async {
     try {
       await _audioHandler.pause();
@@ -175,10 +193,12 @@ class AudioPlayerViewModel extends ChangeNotifier {
     }
   }
 
+  // İleri/geri sarma başlangıç metodu
   Future<void> seekStart() async {
     _isSeeking = true;
   }
 
+  // İleri/geri sarma metodu
   Future<void> seek(Duration position) async {
     try {
       _position = position;
@@ -189,6 +209,7 @@ class AudioPlayerViewModel extends ChangeNotifier {
     }
   }
 
+  // İleri/geri sarma bitiş metodu
   Future<void> seekEnd() async {
     try {
       _isSeeking = false;
@@ -199,6 +220,7 @@ class AudioPlayerViewModel extends ChangeNotifier {
     }
   }
 
+  // Çalmayı durduran metod
   Future<void> stop() async {
     try {
       await _audioHandler.stop();
@@ -208,6 +230,7 @@ class AudioPlayerViewModel extends ChangeNotifier {
     }
   }
 
+  // Sonraki şarkıya geçen metod
   void playNext() async {
     try {
       await _audioHandler.skipToNext();
@@ -217,6 +240,7 @@ class AudioPlayerViewModel extends ChangeNotifier {
     }
   }
 
+  // Önceki şarkıya geçen metod
   void playPrevious() async {
     try {
       await _audioHandler.skipToPrevious();
@@ -226,6 +250,7 @@ class AudioPlayerViewModel extends ChangeNotifier {
     }
   }
 
+  // Getter metodları
   Song? get currentSong => _currentSong;
   List<Song> get songs => _songs;
   bool get isPlaying => _isPlaying;
@@ -235,6 +260,7 @@ class AudioPlayerViewModel extends ChangeNotifier {
   Duration get duration => _duration;
   String? get error => _error;
 
+  // Kaynakları temizleyen dispose metodu
   @override
   void dispose() {
     _playbackStateSubscription?.cancel();
@@ -243,6 +269,7 @@ class AudioPlayerViewModel extends ChangeNotifier {
     super.dispose();
   }
 
+  // Hata mesajını temizleyen metod
   void clearError() {
     _error = null;
     notifyListeners();

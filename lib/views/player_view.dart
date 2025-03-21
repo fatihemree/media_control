@@ -4,13 +4,16 @@ import 'package:provider/provider.dart';
 
 import '../viewmodels/audio_player_viewmodel.dart';
 
+// Müzik çalar ekranı widget'ı
 class PlayerView extends StatelessWidget {
   const PlayerView({super.key});
 
+  // Albüm kapağını oluşturan widget
   Widget _buildAlbumArt(String imageUrl, String songTitle) {
     return Container(
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(8),
+        // Gölge efekti
         boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.3), blurRadius: 20, offset: const Offset(0, 10))],
       ),
       child: ClipRRect(
@@ -19,6 +22,7 @@ class PlayerView extends StatelessWidget {
           imageUrl: imageUrl,
           width: double.infinity,
           fit: BoxFit.cover,
+          // Resim yüklenirken gösterilecek yükleme göstergesi
           placeholder:
               (context, url) => Container(
                 color: Colors.grey[850],
@@ -26,6 +30,7 @@ class PlayerView extends StatelessWidget {
                   child: CircularProgressIndicator(valueColor: AlwaysStoppedAnimation<Color>(Colors.green)),
                 ),
               ),
+          // Resim yüklenemezse gösterilecek hata widget'ı
           errorWidget:
               (context, url, error) => Container(
                 color: Colors.grey[850],
@@ -47,6 +52,7 @@ class PlayerView extends StatelessWidget {
     );
   }
 
+  // İlerleme çubuğunu oluşturan widget
   Widget _buildSlider(BuildContext context, AudioPlayerViewModel viewModel) {
     return SliderTheme(
       data: SliderTheme.of(context).copyWith(
@@ -89,7 +95,7 @@ class PlayerView extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Back button and song title
+                  // Geri butonu ve şarkı başlığı
                   Row(
                     children: [
                       IconButton(
@@ -100,7 +106,7 @@ class PlayerView extends StatelessWidget {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.center,
                           children: [
-                            Text('NOW PLAYING', style: TextStyle(color: Colors.white.withOpacity(0.6), fontSize: 12)),
+                            Text('ÇALAN ŞARKI', style: TextStyle(color: Colors.white.withOpacity(0.6), fontSize: 12)),
                           ],
                         ),
                       ),
@@ -108,6 +114,7 @@ class PlayerView extends StatelessWidget {
                     ],
                   ),
 
+                  // Hata mesajı gösterimi
                   if (viewModel.error != null) ...[
                     const SizedBox(height: 16),
                     Container(
@@ -129,7 +136,9 @@ class PlayerView extends StatelessWidget {
 
                   const SizedBox(height: 30),
 
+                  // Şarkı detayları ve kontroller
                   if (song != null) ...[
+                    // Albüm kapağı
                     Expanded(
                       child: Center(
                         child: Hero(tag: 'album-art-${song.id}', child: _buildAlbumArt(song.albumArt, song.title)),
@@ -138,6 +147,7 @@ class PlayerView extends StatelessWidget {
 
                     const SizedBox(height: 20),
 
+                    // Şarkı başlığı ve sanatçı
                     Text(
                       song.title,
                       style: const TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold),
@@ -147,8 +157,10 @@ class PlayerView extends StatelessWidget {
 
                     const SizedBox(height: 20),
 
+                    // İlerleme çubuğu
                     _buildSlider(context, viewModel),
 
+                    // Süre göstergeleri
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 16),
                       child: Row(
@@ -168,17 +180,21 @@ class PlayerView extends StatelessWidget {
 
                     const SizedBox(height: 20),
 
+                    // Kontrol butonları
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                       children: [
+                        // Karıştır butonu
                         IconButton(
                           icon: Icon(Icons.shuffle, color: viewModel.isShuffleEnabled ? Colors.green : Colors.white),
                           onPressed: () => viewModel.toggleShuffle(),
                         ),
+                        // Önceki şarkı butonu
                         IconButton(
                           icon: const Icon(Icons.skip_previous, color: Colors.white, size: 35),
                           onPressed: () => viewModel.playPrevious(),
                         ),
+                        // Çal/Duraklat butonu
                         Container(
                           width: 64,
                           height: 64,
@@ -198,10 +214,12 @@ class PlayerView extends StatelessWidget {
                             },
                           ),
                         ),
+                        // Sonraki şarkı butonu
                         IconButton(
                           icon: const Icon(Icons.skip_next, color: Colors.white, size: 35),
                           onPressed: () => viewModel.playNext(),
                         ),
+                        // Tekrar butonu
                         IconButton(
                           icon: Icon(Icons.repeat, color: viewModel.isRepeatEnabled ? Colors.green : Colors.white),
                           onPressed: () => viewModel.toggleRepeat(),
@@ -219,6 +237,7 @@ class PlayerView extends StatelessWidget {
     );
   }
 
+  // Süreyi biçimlendiren yardımcı fonksiyon
   String _formatDuration(Duration duration) {
     String twoDigits(int n) => n.toString().padLeft(2, '0');
     final minutes = twoDigits(duration.inMinutes.remainder(60));
